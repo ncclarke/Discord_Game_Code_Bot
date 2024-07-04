@@ -3,7 +3,7 @@ from discord.ext import commands
 import mysql.connector
 from mysql.connector import errorcode
 
-TOKEN = "TOKEN_HERE"
+TOKEN = "TOKEN HERE"
 
 game_code = "NONE"
 game_name = "NONE"
@@ -261,7 +261,181 @@ def record_loss(username, game_name):
 
     return losses_count
 
+def get_win_total(username):
+    connection = get_db_connection()
+    cursor = connection.cursor()
 
+    cursor.execute("""
+        SELECT total_games_won_count 
+        FROM users 
+        WHERE username = %s
+    """, (username,))
+    
+    result = cursor.fetchone()
+    win_total = result[0] if result else 0
+
+    cursor.close()
+    connection.close()
+
+    return win_total
+
+def get_loss_total(username):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT total_loss_count 
+        FROM users 
+        WHERE username = %s
+    """, (username,))
+    
+    result = cursor.fetchone()
+    loss_total = result[0] if result else 0
+
+    cursor.close()
+    connection.close()
+
+    return loss_total
+
+def get_loss_total(username):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT total_loss_count 
+        FROM users 
+        WHERE username = %s
+    """, (username,))
+    
+    result = cursor.fetchone()
+    loss_total = result[0] if result else 0
+
+    cursor.close()
+    connection.close()
+
+    return loss_total
+
+def get_loss_total(username):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT total_loss_count 
+        FROM users 
+        WHERE username = %s
+    """, (username,))
+    
+    result = cursor.fetchone()
+    loss_total = result[0] if result else 0
+
+    cursor.close()
+    connection.close()
+
+    return loss_total
+
+def get_played_games_total(username):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT games_played_count 
+        FROM users 
+        WHERE username = %s
+    """, (username,))
+    
+    result = cursor.fetchone()
+    total = result[0] if result else 0
+
+    cursor.close()
+    connection.close()
+
+    return total
+
+def get_player_stats(username, game_name):
+    user_id = get_or_create_user(username)
+    game_id = get_or_create_game(game_name)
+
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    # Total times played
+    cursor.execute("""
+        SELECT (SELECT COUNT(*) FROM wins WHERE user_id = %s AND game_id = %s) +
+               (SELECT COUNT(*) FROM losses WHERE user_id = %s AND game_id = %s) AS total_times_played
+    """, (user_id, game_id, user_id, game_id))
+    total_times_played = cursor.fetchone()[0]
+
+     # Total times won
+    cursor.execute("SELECT COUNT(*) FROM wins WHERE user_id = %s AND game_id = %s", (user_id, game_id))
+    total_times_won = cursor.fetchone()[0]
+
+    # Total times lost
+    cursor.execute("SELECT losses_count FROM losses WHERE user_id = %s AND game_id = %s", (user_id, game_id))
+    total_times_lost = cursor.fetchone()[0]
+
+    # Highest score
+    cursor.execute("SELECT MAX(points_scored) FROM wins WHERE user_id = %s AND game_id = %s", (user_id, game_id))
+    highest_score = cursor.fetchone()[0] or 0
+
+    cursor.close()
+    connection.close()
+
+    return {
+        "username": username,
+        "game_name": game_name,
+        "total_times_played": total_times_played,
+        "total_times_won": total_times_won,
+        "total_times_lost": total_times_lost,
+        "highest_score": highest_score
+    }
+
+def get_top_winner(game_name):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT u.username, COUNT(w.win_id) AS win_count
+        FROM users u
+        JOIN wins w ON u.user_id = w.user_id
+        JOIN games g ON w.game_id = g.game_id
+        WHERE g.game_name = %s
+        GROUP BY u.username
+        ORDER BY win_count DESC
+        LIMIT 1;
+    """, (game_name,))
+    
+    result = cursor.fetchone()
+    cursor.close()
+    connection.close()
+
+    if result:
+        return {"username": result[0], "win_count": result[1]}
+    else:
+        return None
+
+def get_points_record_holder(game_name):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT u.username, MAX(w.points_scored) AS highest_points
+        FROM users u
+        JOIN wins w ON u.user_id = w.user_id
+        JOIN games g ON w.game_id = g.game_id
+        WHERE g.game_name = %s
+        GROUP BY u.username
+        ORDER BY highest_points DESC
+        LIMIT 1;
+    """, (game_name,))
+    
+    result = cursor.fetchone()
+    cursor.close()
+    connection.close()
+
+    if result:
+        return {"username": result[0], "highest_points": result[1]}
+    else:
+        return None
 
 intents = discord.Intents.default()  # Use default intents
 intents.message_content = True       # Enable intent to read message content (for message commands)
@@ -352,15 +526,64 @@ async def lose(ctx):
     await ctx.send(f"{ctx.author.mention} has lost '{game_name}' they have a total of {losses} for this game.")
 
 @bot.command()
-async def test_win(ctx):
-    global game_name
+async def totalWins(ctx):
     username = str(ctx.author)
-    
-    if game_name == "NONE":
-        await ctx.send("No game has been set. Use !setGameName <title> to set the game name.")
-        return
-    
-    #record_win(username, game_name, score)
-    await ctx.send(f"{ctx.author.mention} has won '{game_name}' with a score of test!")
+    win_total = get_win_total(username)
+    await ctx.send(f"{ctx.author.mention}, has {win_total} total wins.")
+
+@bot.command()
+async def totalLosses(ctx):
+    username = str(ctx.author)
+    loss_total = get_loss_total(username)
+    await ctx.send(f"{ctx.author.mention}, has {loss_total} total losses.")
+
+@bot.command()
+async def totalPlayed(ctx):
+    username = str(ctx.author)
+    total = get_played_games_total(username)
+    await ctx.send(f"{ctx.author.mention}, has played a total of {total} games.")
+
+@bot.command()
+async def overallStats(ctx):
+    username = str(ctx.author)
+    win_total = get_win_total(username)
+    loss_total = get_loss_total(username)
+    games_total = get_played_games_total(username)
+    await ctx.send(f"{ctx.author.mention}, has played a total of {games_total} games. They have won {win_total} games, and lost {loss_total} games.")
+
+@bot.command()
+async def stats(ctx, *, game_name: str):
+    username = str(ctx.author)
+    stats = get_player_stats(username, game_name)
+    if isinstance(stats, str):
+        await ctx.send(stats)
+    else:
+        await ctx.send(f"Stats for {ctx.author.mention} for game '{game_name}':\n"
+                       f"Total Times Played: {stats['total_times_played']}\n"
+                       f"Total Wins: {stats['total_wins']}\n"
+                       f"Total Losses: {stats['total_losses']}\n"
+                       f"High Score: {stats['highest_score']}")
+
+@bot.command()
+async def winLeader(ctx, *, game_name: str):
+    top_winner = get_top_winner(game_name)
+
+    if top_winner:
+        response = f"The top winner for '{game_name}' is {top_winner['username']} with {top_winner['win_count']} wins."
+    else:
+        response = f"No wins recorded for the game '{game_name}'."
+
+    await ctx.send(response)
+
+@bot.command()
+async def pointsLeader(ctx, *, game_name: str):
+    record_holder = get_points_record_holder(game_name)
+
+    if record_holder:
+        response = f"The points record holder for '{game_name}' is {record_holder['username']} with {record_holder['highest_points']} points."
+    else:
+        response = f"No points record found for the game '{game_name}'."
+
+    await ctx.send(response)
 
 bot.run(TOKEN)
